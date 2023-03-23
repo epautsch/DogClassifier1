@@ -166,7 +166,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Using device:', device)
 
-    pretrained_model_name = 'google/vit-base-patch16-224'
+    pretrained_model_name = 'google/vit-large-patch32-384'
 
     logging_callback = LoggingCallback()
 

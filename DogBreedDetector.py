@@ -1,3 +1,8 @@
+import random
+from typing import Tuple
+import os
+import xml.etree.ElementTree as ET
+
 import torch
 import torchvision
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
@@ -11,25 +16,22 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 
-import os
-import xml.etree.ElementTree as ET
 
-
-def get_detection_model(num_classes):
+def get_detection_model(num_classes: int) -> torchvision.models.detection:
     model = fasterrcnn_resnet50_fpn(pretrained=True)
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
     return model
 
 
-def get_transforms():
+def get_transforms() -> torchvision.transforms.Compose:
     return torchvision.transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
 
-def parse_annotations_file(file_path):
+def parse_annotations_file(file_path: str) -> Tuple[str, str, Tuple[int, int, int, int]]:
     tree = ET.parse(file_path)
     root = tree.getroot()
 
@@ -53,7 +55,7 @@ def parse_annotations_file(file_path):
     return filename, breed, bbox
 
 
-def load_annotations(root_folder, annotations_folder):
+def load_annotations(root_folder: str, annotations_folder: str) -> Tuple[list, list]:
     annotations = []
 
     breed_folders = sorted(os.listdir(annotations_folder))
@@ -77,13 +79,13 @@ def load_annotations(root_folder, annotations_folder):
     return annotations, breeds
 
 
-def split_data(annotations, test_size=0.2, random_state=42):
+def split_data(annotations, test_size=0.2, random_state=42) -> Tuple[list, list]:
     train_annotations, test_annotations = train_test_split(annotations, test_size=test_size, random_state=random_state,
                                                            stratify=[a[1] for a in annotations])
     return train_annotations, test_annotations
 
 
-def collate_fn(batch):
+def collate_fn(batch: list) -> Tuple[list, list]:
     images, targets = zip(*batch)
     images = list(images)
     targets = [{k: v for k, v in t.items()} for t in targets]
@@ -99,10 +101,10 @@ class StanfordDogsDataset(Dataset):
         print(self.classes)
         print(len(self.classes))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.annotations)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, dict]:
         img_path, breed, bbox = self.annotations[idx]
         img = cv2.imread(os.path.join(self.root, img_path))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -118,7 +120,7 @@ class StanfordDogsDataset(Dataset):
         return img, target
 
 
-def train_one_epoch(model, data_loader, optimizer, device, gradient_accumulation_steps=4):
+def train_one_epoch(model, data_loader, optimizer, device, gradient_accumulation_steps=4) -> float:
     model.train()
     total_loss = 0
     num_batches = 0
@@ -151,7 +153,7 @@ def train_one_epoch(model, data_loader, optimizer, device, gradient_accumulation
     return total_loss / num_batches
 
 
-def iou(box1, box2):
+def iou(box1, box2) -> float:
     xmin1, ymin1, xmax1, ymax1 = box1
     xmin2, ymin2, xmax2, ymax2 = box2
 
@@ -170,7 +172,7 @@ def iou(box1, box2):
     return inter_area / union_area
 
 
-def evaluate(model, data_loader, device, iou_threshold=0.5):
+def evaluate(model, data_loader, device, iou_threshold=0.5) -> Tuple[float, float]:
     model.eval()
     total = 0
     correct = 0
@@ -204,7 +206,7 @@ def evaluate(model, data_loader, device, iou_threshold=0.5):
     return accuracy
 
 
-def plot_metric(metric_values, title, xlabel, ylabel, save_name):
+def plot_metric(metric_values, title, xlabel, ylabel, save_name) -> None:
     plt.figure()
     sns.lineplot(x=np.arange(1, len(metric_values) + 1), y=metric_values, marker='o')
     plt.title(title)
@@ -217,8 +219,43 @@ def plot_metric(metric_values, title, xlabel, ylabel, save_name):
     plt.show()
 
 
-if __name__ == '__main__':
+def visualize_predictions(model, dataset, device, num_images=5, save_dir='predictions'):
+    model.eval()
 
+    os.makedirs(save_dir, exist_ok=True)
+
+    indices = random.sample(range(len(dataset)), num_images)
+
+    for i, idx in enumerate(indices):
+        img, target = dataset[idx]
+        img_tensor = img.unsqueeze(0).to(device)
+
+        with torch.no_grad():
+            prediction = model(img_tensor)[0]
+
+            img_np = img.permute(1, 2, 0).numpy()
+            img_np = (img_np * np.array([0.229, 0.224, 0.225])) + np.array([0.485, 0.456, 0.406])
+            img_np = (img_np * 255).astype(np.uint8)
+
+            # predicted boxes
+            for box, label in zip(prediction['boxes'], prediction['labels']):
+                box = box.to(torch.int64).tolist()
+                label = dog_breeds[label.item() - 1]
+                cv2.rectangle(img_np, (box[0], box[1]), (box[2], box[3]), (255, 0, 0), 2)
+                cv2.putText(img_np, f'Pred: {label}', (box[0], box[1] - 10), cv2.FRONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+            # ground truth boxes
+            for box, label in zip(target['boxes'], target['labels']):
+                box = box.to(torch.int64).tolist()
+                label = dog_breeds[label.item() - 1]
+                cv2.rectangle(img_np, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+                cv2.putText(img_np, f'GT: {label}', (box[0], box[1] - 10), cv2.FRONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        cv2.imwrite(os.path.join(save_dir, f'prediction_{i}.jpg'), cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR))
+        print(f'Saved prediction_{i}.jpg')
+
+
+def run(train=True, num_epochs=10, model_save_path='./dog_breed_detection_model.pth'):
     annotations_folder = './Annotations'
     image_folder = './Images'
     annotations, dog_breeds = load_annotations(image_folder, annotations_folder)
@@ -243,24 +280,34 @@ if __name__ == '__main__':
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
 
-    num_epochs = 10
-    best_accuracy = 0.0
-    model_save_path = './dog_breed_detection_model.pth'
-    train_losses = []
-    learning_rates = []
+    if train:
+        best_accuracy = 0.0
+        train_losses = []
+        learning_rates = []
 
-    for epoch in range(num_epochs):
-        epoch_loss = train_one_epoch(model, train_data_loader, optimizer, device)
-        train_losses.append(epoch_loss)
-        learning_rates.append(optimizer.param_groups[0]['lr'])
+        for epoch in range(num_epochs):
+            epoch_loss = train_one_epoch(model, train_data_loader, optimizer, device)
+            train_losses.append(epoch_loss)
+            learning_rates.append(optimizer.param_groups[0]['lr'])
 
-        accuracy = evaluate(model, val_data_loader, device)
-        print(f'Epoch: {epoch + 1}, Loss: {epoch_loss:.4f}, Accuracy: {accuracy:.4f}')
+            accuracy = evaluate(model, val_data_loader, device)
+            print(f'Epoch: {epoch + 1}, Loss: {epoch_loss:.4f}, Accuracy: {accuracy:.4f}')
 
-        if accuracy > best_accuracy:
-            best_accuracy = accuracy
-            torch.save(model.state_dict(), model_save_path)
-            print(f'Model saved at epoch {epoch + 1} with accuracy {best_accuracy:.4f}')
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                torch.save(model.state_dict(), model_save_path)
+                print(f'Model saved at epoch {epoch + 1} with accuracy {best_accuracy:.4f}')
 
-    plot_metric(train_losses, 'Training Loss per Epoch', 'Epoch', 'Loss', 'dog_breed_detection_train_loss.png')
-    plot_metric(learning_rates, 'Learning Rate per Epoch', 'Epoch', 'Learning Rate', 'dog_breed_detection_learning_rate.png')
+        plot_metric(train_losses, 'Training Loss per Epoch', 'Epoch', 'Loss', 'dog_breed_detection_train_loss.png')
+        plot_metric(learning_rates, 'Learning Rate per Epoch', 'Epoch', 'Learning Rate',
+                    'dog_breed_detection_learning_rate.png')
+    else:
+        model.load_state_dict(torch.load(model_save_path))
+        model.to(device)
+        visualize_predictions(model, val_dataset, device)
+
+
+if __name__ == '__main__':
+    # run(train=True, num_epochs=10)
+
+    run(train=False)
