@@ -43,7 +43,6 @@ def parse_annotations_file(file_path: str) -> Tuple[str, str, Tuple[int, int, in
         folder = folder.replace('%s', breed_folder)
         filename = filename.replace('%s', breed_folder + '_' + file_number)
 
-
     breed = root.find('object').find('name').text
     bndbox = root.find('object').find('bndbox')
     xmin = int(bndbox.find('xmin').text)
@@ -74,7 +73,6 @@ def load_annotations(root_folder: str, annotations_folder: str) -> Tuple[list, l
                 breeds.append(breed)
 
     breeds = sorted(breeds)
-    print('Breeds found:', breeds)
 
     return annotations, breeds
 
@@ -98,8 +96,6 @@ class StanfordDogsDataset(Dataset):
         self.annotations = annotations
         self.transforms = transforms
         self.classes = dog_breeds
-        print(self.classes)
-        print(len(self.classes))
 
     def __len__(self) -> int:
         return len(self.annotations)
@@ -219,7 +215,7 @@ def plot_metric(metric_values, title, xlabel, ylabel, save_name) -> None:
     plt.show()
 
 
-def visualize_predictions(model, dataset, device, num_images=5, save_dir='predictions'):
+def visualize_predictions(model, dataset, device, dog_breeds, num_images=5, save_dir='predictions'):
     model.eval()
 
     os.makedirs(save_dir, exist_ok=True)
@@ -237,20 +233,25 @@ def visualize_predictions(model, dataset, device, num_images=5, save_dir='predic
             img_np = (img_np * np.array([0.229, 0.224, 0.225])) + np.array([0.485, 0.456, 0.406])
             img_np = (img_np * 255).astype(np.uint8)
 
+            img_umat = cv2.UMat(img_np)
+
             # predicted boxes
             for box, label in zip(prediction['boxes'], prediction['labels']):
                 box = box.to(torch.int64).tolist()
                 label = dog_breeds[label.item() - 1]
-                cv2.rectangle(img_np, (box[0], box[1]), (box[2], box[3]), (255, 0, 0), 2)
-                cv2.putText(img_np, f'Pred: {label}', (box[0], box[1] - 10), cv2.FRONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+                cv2.rectangle(img_umat, (box[0], box[1]), (box[2], box[3]), (255, 0, 0), 2)
+                cv2.putText(img_umat, f'Pred: {label}', (box[0], box[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                            (255, 0, 0), 2)
 
             # ground truth boxes
             for box, label in zip(target['boxes'], target['labels']):
                 box = box.to(torch.int64).tolist()
                 label = dog_breeds[label.item() - 1]
-                cv2.rectangle(img_np, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
-                cv2.putText(img_np, f'GT: {label}', (box[0], box[1] - 10), cv2.FRONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                cv2.rectangle(img_umat, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+                cv2.putText(img_umat, f'GT: {label}', (box[0], box[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0),
+                            2)
 
+        img_np = img_umat.get()
         cv2.imwrite(os.path.join(save_dir, f'prediction_{i}.jpg'), cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR))
         print(f'Saved prediction_{i}.jpg')
 
@@ -304,7 +305,7 @@ def run(train=True, num_epochs=10, model_save_path='./dog_breed_detection_model.
     else:
         model.load_state_dict(torch.load(model_save_path))
         model.to(device)
-        visualize_predictions(model, val_dataset, device)
+        visualize_predictions(model, val_dataset, device, dog_breeds)
 
 
 if __name__ == '__main__':
