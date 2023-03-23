@@ -29,6 +29,10 @@ def get_transform(model_name: str) -> transforms.Compose:
         size = (224, 224)
         mean = [0.485, 0.456, 0.406]
         std = [0.229, 0.224, 0.225]
+    elif model_name == 'google/vit-large-patch32-384':
+        size = (384, 384)
+        mean = [0.485, 0.456, 0.406]
+        std = [0.229, 0.224, 0.225]
     else:
         raise ValueError(f'Unknown model name: {model_name}')
 
@@ -57,7 +61,6 @@ def fine_tune_model(pretrained_model_name: str,
                     learning_rate: float,
                     weight_decay: float,
                     callbacks=None) -> Tuple[torch.nn.Module, dict]:
-
     model = ViTForImageClassification.from_pretrained(pretrained_model_name,
                                                       num_labels=len(full_dataset.classes),
                                                       ignore_mismatched_sizes=True).to(device)
@@ -97,7 +100,6 @@ def fine_tune_model(pretrained_model_name: str,
 def evaluate_saved_model(model_path: str,
                          feature_extractor_name: str,
                          test_dataloader: DataLoader) -> Tuple[float, pipeline]:
-
     model = AutoModelForImageClassification.from_pretrained(model_path).to(device)
     feature_extractor = AutoFeatureExtractor.from_pretrained(feature_extractor_name)
 
@@ -164,7 +166,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Using device:', device)
 
-    pretrained_model_name = 'google/vit-base-patch16-224'
+    pretrained_model_name = 'google/vit-large-patch32-384'
 
     logging_callback = LoggingCallback()
 

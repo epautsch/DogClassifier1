@@ -9,6 +9,7 @@ numpy = "*"
 tensorboard = "*"
 matplotlib = "*"
 seaborn = "*"
+opencv-python = "*"
 
 [dev-packages]
 
