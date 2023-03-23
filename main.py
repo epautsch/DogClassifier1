@@ -166,7 +166,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Using device:', device)
 
-    pretrained_model_name = 'google/vit-large-patch32-384'
+    pretrained_model_name = 'google/vit-base-patch16-224'
 
     logging_callback = LoggingCallback()
 
@@ -185,7 +185,7 @@ if __name__ == '__main__':
 
     # model, eval_results = fine_tune_model(pretrained_model_name,
     #                                       train_dataloader,
-    #                                       num_epochs=3,
+    #                                       num_epochs=10,
     #                                       learning_rate=1e-4,
     #                                       weight_decay=1e-2,
     #                                       callbacks=[logging_callback])
@@ -199,3 +199,4 @@ if __name__ == '__main__':
     model_path = './' + pretrained_model_name.replace('/', '_') + '_output'
     feature_extractor_name = pretrained_model_name
     accuracy, classify = evaluate_saved_model(model_path, feature_extractor_name, test_dataloader)
+
