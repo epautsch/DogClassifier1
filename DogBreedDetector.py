@@ -4,6 +4,7 @@ from torchvision.models.detection import fasterrcnn_resnet50_fpn
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
+from torch.cuda.amp import autocast, GradScaler
 import cv2
 from sklearn.model_selection import train_test_split
 import seaborn as sns
@@ -121,22 +122,30 @@ def train_one_epoch(model, data_loader, optimizer, device, gradient_accumulation
     model.train()
     total_loss = 0
     num_batches = 0
+    scaler = GradScaler()
     optimizer.zero_grad()
 
     for step, (images, targets) in enumerate(data_loader):
         images = [image.to(device) for image in images]
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        loss_dict = model(images, targets)
-        losses = sum(loss for loss in loss_dict.values())
-        total_loss += losses.item()
-        num_batches += 1
+        try:
+            with autocast():
+                loss_dict = model(images, targets)
+                losses = sum(loss for loss in loss_dict.values())
+            total_loss += losses.item()
+            num_batches += 1
 
-        losses /= gradient_accumulation_steps
-        losses.backward()
+            scaled_losses = scaler.scale(losses)
+            scaled_losses /= gradient_accumulation_steps
+            scaled_losses.backward()
+        except Exception as e:
+            print(f"Error in step {step}: {e}")
+            continue
 
         if (step + 1) % gradient_accumulation_steps == 0:
-            optimizer.step()
+            scaler.step(optimizer)
+            scaler.update()
             optimizer.zero_grad()
 
     return total_loss / num_batches
