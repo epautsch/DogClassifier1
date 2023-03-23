@@ -12,6 +12,8 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from PIL import Image
+#NEW -Maddie
+from torchvision.utils import make_grid
 
 
 def find_latest_checkpoint(output_dir: str) -> str:
@@ -162,6 +164,15 @@ def plot_metrics(losses: list[float], learning_rate: list[float], pretrained_mod
     plt.close()
 
 
+# NEW -Maddie
+def imshow(img, label):
+    img = img / 2 + 0.5  #unnormalize
+    npimg = img.numpy()
+    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    plt.xlabel(label)
+    plt.show()
+
+
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Using device:', device)
@@ -204,4 +215,13 @@ if __name__ == '__main__':
 
     feature_extractor_name = pretrained_model_name
     accuracy, classify = evaluate_saved_model(model_path, feature_extractor_name, test_dataloader)
-
+    # NEW - Maddie
+    dataiter = iter(test_dataloader)
+    images, labels = next(dataiter)
+    listim = [images[0], images[1], images[2], images[3]]
+    labellist = [0, 0, 0, 0]
+    for j in range(4):
+        labellist[j] = full_dataset.classes[labels[j]].split('-')[1]
+    labellist = (' '.join('%5s' % labellist[j] for j in range(4)))
+    imshow(make_grid(listim),  labellist)
+    print(' '.join('%5s' % labellist[j] for j in range(4)))
