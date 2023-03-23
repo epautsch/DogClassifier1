@@ -25,11 +25,11 @@ def find_latest_checkpoint(output_dir: str) -> str:
 
 
 def get_transform(model_name: str) -> transforms.Compose:
-    if model_name == 'microsoft/resnet-50' or model_name == 'microsoft/resnet-152' or model_name == 'google/vit-base-patch16-224':
+    if model_name == 'microsoft/resnet-50' or model_name == 'microsoft/resnet-152' or model_name == 'google/vit-base-patch16-224' or model_name == 'ep44/Stanford_dogs-google_vit_base_patch16_224':
         size = (224, 224)
         mean = [0.485, 0.456, 0.406]
         std = [0.229, 0.224, 0.225]
-    elif model_name == 'google/vit-large-patch32-384':
+    elif model_name == 'google/vit-large-patch32-384' or model_name == 'ep44/Stanford_dogs-google_vit_large_patch32_384':
         size = (384, 384)
         mean = [0.485, 0.456, 0.406]
         std = [0.229, 0.224, 0.225]
@@ -166,7 +166,8 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Using device:', device)
 
-    pretrained_model_name = 'google/vit-large-patch32-384'
+    pretrained_model_name = 'ep44/Stanford_dogs-google_vit_large_patch32_384'
+    # pretrained_model_name = 'ep44/Stanford_dogs-google_vit_base_patch16_224'
 
     logging_callback = LoggingCallback()
 
@@ -196,7 +197,11 @@ if __name__ == '__main__':
     #
     # print(f"Accuracy: {eval_results['eval_accuracy']:.4f}")
     #
-    model_path = './' + pretrained_model_name.replace('/', '_') + '_output'
+
+    # model_path = './' + pretrained_model_name.replace('/', '_') + '_output'
+    model_path = 'ep44/Stanford_dogs-google_vit_large_patch32_384'
+    # model_path = 'ep44/Stanford_dogs-google_vit_base_patch16_224'
+
     feature_extractor_name = pretrained_model_name
     accuracy, classify = evaluate_saved_model(model_path, feature_extractor_name, test_dataloader)
 
