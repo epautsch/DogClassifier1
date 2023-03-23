@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 #NEW -Maddie
 from torchvision.utils import make_grid
+from PIL import Image
 
 
 def find_latest_checkpoint(output_dir: str) -> str:
@@ -172,6 +173,25 @@ def imshow(img, label):
     plt.xlabel(label)
     plt.show()
 
+def predict(classify, dataloader, num_images=4):
+    dataiter = iter(dataloader)
+    images, labels = next(dataiter)
+    listim = [images[j] for j in range(num_images)]
+    labellist = [j for j in range(num_images)]
+    for j in range(num_images):
+        labellist[j] = full_dataset.classes[labels[j]].split('-')[1]
+        img = transforms.ToPILImage()(listim[j]).convert("RGB")
+        predictions = classify(img)
+        predictions = predictions[0]
+        predictions = predictions['label']
+        num = predictions.split('_')[1]
+        pred = torch.tensor(int(num))
+        pred = full_dataset.classes[pred].split('-')[1]
+        print("Prediction Image ", j+1, ": ", pred)
+        print("Actual Image ", j+1, ": ", labellist[j])
+
+    labellist = (' '.join('%5s' % labellist[j] for j in range(num_images)))
+    imshow(make_grid(listim), labellist)
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -216,12 +236,5 @@ if __name__ == '__main__':
     feature_extractor_name = pretrained_model_name
     accuracy, classify = evaluate_saved_model(model_path, feature_extractor_name, test_dataloader)
     # NEW - Maddie
-    dataiter = iter(test_dataloader)
-    images, labels = next(dataiter)
-    listim = [images[0], images[1], images[2], images[3]]
-    labellist = [0, 0, 0, 0]
-    for j in range(4):
-        labellist[j] = full_dataset.classes[labels[j]].split('-')[1]
-    labellist = (' '.join('%5s' % labellist[j] for j in range(4)))
-    imshow(make_grid(listim),  labellist)
-    print(' '.join('%5s' % labellist[j] for j in range(4)))
+    predict(classify, test_dataloader, num_images=4)
+
