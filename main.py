@@ -176,22 +176,19 @@ def imshow(img, label):
 def predict(classify, dataloader, num_images=4):
     dataiter = iter(dataloader)
     images, labels = next(dataiter)
-    listim = [images[j] for j in range(num_images)]
-    labellist = [j for j in range(num_images)]
+    list_images = [images[j] for j in range(num_images)]
+    list_labels = [j for j in range(num_images)]
     for j in range(num_images):
-        labellist[j] = full_dataset.classes[labels[j]].split('-')[1]
-        img = transforms.ToPILImage()(listim[j]).convert("RGB")
-        predictions = classify(img)
-        predictions = predictions[0]
-        predictions = predictions['label']
+        list_labels[j] = full_dataset.classes[labels[j]].split('-')[1]
+        img = transforms.ToPILImage()(list_images[j]).convert("RGB")
+        predictions = classify(img)[0]['label']
         num = predictions.split('_')[1]
-        pred = torch.tensor(int(num))
-        pred = full_dataset.classes[pred].split('-')[1]
+        pred = full_dataset.classes[torch.tensor(int(num))].split('-')[1]
+        x_label = ("Actual: ",list_labels[j], "Predicted: ", pred)
         print("Prediction Image ", j+1, ": ", pred)
-        print("Actual Image ", j+1, ": ", labellist[j])
+        print("Actual Image ", j+1, ": ", list_labels[j])
+        imshow(list_images[j], x_label)
 
-    labellist = (' '.join('%5s' % labellist[j] for j in range(num_images)))
-    imshow(make_grid(listim), labellist)
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -204,7 +201,7 @@ if __name__ == '__main__':
 
     transform = get_transform(pretrained_model_name)
 
-    train_dir = "./images"
+    train_dir = "./images" # pass transform into image - does processing
     full_dataset = ImageFolder(train_dir, transform=transform)
 
     train_ratio = 0.8
@@ -236,5 +233,5 @@ if __name__ == '__main__':
     feature_extractor_name = pretrained_model_name
     accuracy, classify = evaluate_saved_model(model_path, feature_extractor_name, test_dataloader)
     # NEW - Maddie
-    predict(classify, test_dataloader, num_images=4)
+    predict(classify, test_dataloader, num_images=1)
 
