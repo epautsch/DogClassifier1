@@ -1,4 +1,5 @@
 import random
+import time
 from typing import Tuple
 import os
 import xml.etree.ElementTree as ET
@@ -168,7 +169,7 @@ def iou(box1, box2) -> float:
     return inter_area / union_area
 
 
-def evaluate(model, data_loader, device, iou_threshold=0.6) -> Tuple[float, float]:
+def evaluate(model, data_loader, device, iou_threshold=0.7) -> Tuple[float, float]:
     model.eval()
     total = 0
     correct = 0
@@ -263,7 +264,7 @@ def visualize_predictions(model, dataset, device, dog_breeds, num_images=5, save
         print(f'Saved prediction_{i}.jpg')
 
 
-def run(num_epochs, train=True, model_save_path='./dog_breed_detection_model_1.pth'):
+def run(num_epochs, train=True, model_save_path='./dog_breed_detection_model_2.pth'):
     annotations_folder = './Annotations'
     image_folder = './Images'
     annotations, dog_breeds = load_annotations(image_folder, annotations_folder)
@@ -292,8 +293,13 @@ def run(num_epochs, train=True, model_save_path='./dog_breed_detection_model_1.p
         best_accuracy = 0.0
         train_losses = []
         accuracies = []
+        training_times = []
 
+        train_start_time = time.time()
+        print(f'Training started at {time.strftime("%H:%M:%S", time.localtime())}')
         for epoch in range(num_epochs):
+            epoch_start_time = time.time()
+
             epoch_loss = train_one_epoch(model, train_data_loader, optimizer, device)
             train_losses.append(epoch_loss)
 
@@ -307,12 +313,22 @@ def run(num_epochs, train=True, model_save_path='./dog_breed_detection_model_1.p
                 print(f'Model saved at epoch {epoch + 1} with accuracy {best_accuracy:.4f}')
 
             if epoch == num_epochs - 1:
-                finished_model_save_path = model_save_path.replace('.pth', '_1_finished.pth')
+                finished_model_save_path = model_save_path.replace('.pth', '_finished.pth')
                 torch.save(model.state_dict(), finished_model_save_path)
 
-        plot_metric(train_losses, 'Training Loss per Epoch', 'Epoch', 'Loss', 'dog_breed_detection_train_loss.png')
+            epoch_end_time = time.time()
+            epoch_time = epoch_end_time - epoch_start_time
+            training_times.append(epoch_time)
+            print(f'Epoch time: {epoch_time:.2f} seconds')
+
+        train_end_time = time.time()
+        train_time = train_end_time - train_start_time
+        print(f'Training finished at {time.strftime("%H:%M:%S", time.localtime())}')
+        print(f'Training time: {train_time:.2f} seconds')
+
+        plot_metric(train_losses, 'Training Loss per Epoch', 'Epoch', 'Loss', 'dog_breed_detection_train_loss_2.png')
         plot_metric(accuracies, 'Accuracy per Epoch', 'Epoch', 'Accuracy',
-                    'dog_breed_detection_accuracy.png')
+                    'dog_breed_detection_accuracy_2.png')
     else:
         model.load_state_dict(torch.load(model_save_path))
         model.to(device)
@@ -320,6 +336,6 @@ def run(num_epochs, train=True, model_save_path='./dog_breed_detection_model_1.p
 
 
 if __name__ == '__main__':
-    run(num_epochs=20, train=True)
+    run(num_epochs=50, train=True)
 
     run(train=False)
