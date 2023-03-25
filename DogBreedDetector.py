@@ -263,7 +263,7 @@ def visualize_predictions(model, dataset, device, dog_breeds, num_images=5, save
         print(f'Saved prediction_{i}.jpg')
 
 
-def run(train=True, num_epochs=10, model_save_path='./dog_breed_detection_model_1.pth'):
+def run(num_epochs, train=True, model_save_path='./dog_breed_detection_model_1.pth'):
     annotations_folder = './Annotations'
     image_folder = './Images'
     annotations, dog_breeds = load_annotations(image_folder, annotations_folder)
@@ -320,6 +320,6 @@ def run(train=True, num_epochs=10, model_save_path='./dog_breed_detection_model_
 
 
 if __name__ == '__main__':
-    run(train=True, num_epochs=10)
+    run(num_epochs=20, train=True)
 
     run(train=False)
