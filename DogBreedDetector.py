@@ -1,4 +1,5 @@
 import random
+import time
 from typing import Tuple
 import os
 import xml.etree.ElementTree as ET
@@ -168,7 +169,7 @@ def iou(box1, box2) -> float:
     return inter_area / union_area
 
 
-def evaluate(model, data_loader, device, iou_threshold=0.5) -> Tuple[float, float]:
+def evaluate(model, data_loader, device, iou_threshold=0.7) -> Tuple[float, float]:
     model.eval()
     total = 0
     correct = 0
@@ -235,28 +236,35 @@ def visualize_predictions(model, dataset, device, dog_breeds, num_images=5, save
 
             img_umat = cv2.UMat(img_np)
 
-            # predicted boxes
-            for box, label in zip(prediction['boxes'], prediction['labels']):
-                box = box.to(torch.int64).tolist()
-                label = dog_breeds[label.item() - 1]
-                cv2.rectangle(img_umat, (box[0], box[1]), (box[2], box[3]), (255, 0, 0), 2)
-                cv2.putText(img_umat, f'Pred: {label}', (box[0], box[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                            (255, 0, 0), 2)
+            # Show only highest confidence prediction
+            highest_conf = prediction['scores'].max().item()
+            pred_box = prediction['boxes'][prediction['scores'] == highest_conf]
+            pred_box = pred_box.to(torch.int64).tolist()[0]
+            pred_label = prediction['labels'][prediction['scores'] == highest_conf]
+            pred_label = dog_breeds[pred_label.item()]
+            cv2.rectangle(img_umat, (pred_box[0], pred_box[1]), (pred_box[2], pred_box[3]), (255, 0, 0), 2)
+            cv2.putText(img_umat, f'Pred: {pred_label}', (pred_box[0] + 5, pred_box[1] + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (176, 4, 4), 2)
+
+            # for box, label in zip(prediction['boxes'], prediction['labels']):
+            #     box = box.to(torch.int64).tolist()
+            #     label = dog_breeds[label.item() - 1]
+            #     cv2.rectangle(img_umat, (box[0], box[1]), (box[2], box[3]), (255, 0, 0), 2)
+            #     cv2.putText(img_umat, f'Pred: {label}', (box[0], box[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+            #                 (255, 0, 0), 2)
 
             # ground truth boxes
             for box, label in zip(target['boxes'], target['labels']):
                 box = box.to(torch.int64).tolist()
-                label = dog_breeds[label.item() - 1]
-                cv2.rectangle(img_umat, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
-                cv2.putText(img_umat, f'GT: {label}', (box[0], box[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0),
-                            2)
+                label = dog_breeds[label.item()]
+                cv2.rectangle(img_umat, (box[0], box[1]), (box[2], box[3]), (20, 20, 245), 2)
+                cv2.putText(img_umat, f'GT: {label}', (box[0] + 5, box[3] - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (20, 20, 245), 2)
 
         img_np = img_umat.get()
         cv2.imwrite(os.path.join(save_dir, f'prediction_{i}.jpg'), cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR))
         print(f'Saved prediction_{i}.jpg')
 
 
-def run(train=True, num_epochs=10, model_save_path='./dog_breed_detection_model.pth'):
+def run(num_epochs, train=True, model_save_path='./dog_breed_detection_model_2.pth'):
     annotations_folder = './Annotations'
     image_folder = './Images'
     annotations, dog_breeds = load_annotations(image_folder, annotations_folder)
@@ -279,19 +287,24 @@ def run(train=True, num_epochs=10, model_save_path='./dog_breed_detection_model.
     print(device)
     model.to(device)
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
+    optimizer = torch.optim.SGD(params, lr=0.0008, momentum=0.9, weight_decay=0.0005)
 
     if train:
         best_accuracy = 0.0
         train_losses = []
-        learning_rates = []
+        accuracies = []
+        training_times = []
 
+        train_start_time = time.time()
+        print(f'Training started at {time.strftime("%H:%M:%S", time.localtime())}')
         for epoch in range(num_epochs):
+            epoch_start_time = time.time()
+
             epoch_loss = train_one_epoch(model, train_data_loader, optimizer, device)
             train_losses.append(epoch_loss)
-            learning_rates.append(optimizer.param_groups[0]['lr'])
 
             accuracy = evaluate(model, val_data_loader, device)
+            accuracies.append(accuracy)
             print(f'Epoch: {epoch + 1}, Loss: {epoch_loss:.4f}, Accuracy: {accuracy:.4f}')
 
             if accuracy > best_accuracy:
@@ -299,9 +312,23 @@ def run(train=True, num_epochs=10, model_save_path='./dog_breed_detection_model.
                 torch.save(model.state_dict(), model_save_path)
                 print(f'Model saved at epoch {epoch + 1} with accuracy {best_accuracy:.4f}')
 
-        plot_metric(train_losses, 'Training Loss per Epoch', 'Epoch', 'Loss', 'dog_breed_detection_train_loss.png')
-        plot_metric(learning_rates, 'Learning Rate per Epoch', 'Epoch', 'Learning Rate',
-                    'dog_breed_detection_learning_rate.png')
+            if epoch == num_epochs - 1:
+                finished_model_save_path = model_save_path.replace('.pth', '_finished.pth')
+                torch.save(model.state_dict(), finished_model_save_path)
+
+            epoch_end_time = time.time()
+            epoch_time = epoch_end_time - epoch_start_time
+            training_times.append(epoch_time)
+            print(f'Epoch time: {epoch_time:.2f} seconds')
+
+        train_end_time = time.time()
+        train_time = train_end_time - train_start_time
+        print(f'Training finished at {time.strftime("%H:%M:%S", time.localtime())}')
+        print(f'Training time: {train_time:.2f} seconds')
+
+        plot_metric(train_losses, 'Training Loss per Epoch', 'Epoch', 'Loss', 'dog_breed_detection_train_loss_2.png')
+        plot_metric(accuracies, 'Accuracy per Epoch', 'Epoch', 'Accuracy',
+                    'dog_breed_detection_accuracy_2.png')
     else:
         model.load_state_dict(torch.load(model_save_path))
         model.to(device)
@@ -309,6 +336,6 @@ def run(train=True, num_epochs=10, model_save_path='./dog_breed_detection_model.
 
 
 if __name__ == '__main__':
-    # run(train=True, num_epochs=10)
+    run(num_epochs=50, train=True)
 
     run(train=False)
