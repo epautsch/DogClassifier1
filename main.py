@@ -1,4 +1,6 @@
 import os, re
+
+import requests
 import torch
 from typing import Tuple
 
@@ -178,16 +180,31 @@ def predict(classify, dataloader, num_images=4):
     images, labels = next(dataiter)
     list_images = [images[j] for j in range(num_images)]
     list_labels = [j for j in range(num_images)]
+    prediction_list = [(classify(transforms.ToPILImage()(list_images[j]).convert("RGB")))[0]['label'] for j in range(num_images)]
     for j in range(num_images):
         list_labels[j] = full_dataset.classes[labels[j]].split('-')[1]
-        img = transforms.ToPILImage()(list_images[j]).convert("RGB")
-        predictions = classify(img)[0]['label']
-        num = predictions.split('_')[1]
-        pred = full_dataset.classes[torch.tensor(int(num))].split('-')[1]
-        x_label = ("Actual: ",list_labels[j], "Predicted: ", pred)
-        print("Prediction Image ", j+1, ": ", pred)
-        print("Actual Image ", j+1, ": ", list_labels[j])
+        num = prediction_list[j].split('_')[1]
+        pred = (full_dataset.classes[torch.tensor(int(num))]).split('-')[1]
+        x_label = ("Actual: ", list_labels[j], "Predicted: ", pred)
+        print("Prediction Image: ", pred)
+        print("Actual Image: ", list_labels[j])
         imshow(list_images[j], x_label)
+
+
+# NEW -Maddie
+def new_image_prediction(model, image_path, transformer):
+    img_name = Image.open(image_path)
+    #transforms.ToPILImage()(Image.open(image_path)).convert("RGB")
+    #img = ImageFolder(image_path, transformer)
+    #img = transformer(img_name)
+    #PILimage = img.ToPILImage()
+    label = model(img_name) #[0]['label']
+    num = label[0]['label'].split('_')[1]
+    prediction = (full_dataset.classes[torch.tensor(int(num))]).split('-')[1]
+    x_label = ("Predicted: ", prediction)
+    plt.imshow(img_name)
+    plt.xlabel(x_label)
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -233,5 +250,7 @@ if __name__ == '__main__':
     feature_extractor_name = pretrained_model_name
     accuracy, classify = evaluate_saved_model(model_path, feature_extractor_name, test_dataloader)
     # NEW - Maddie
-    predict(classify, test_dataloader, num_images=1)
+    predict(classify, test_dataloader, num_images=4)
+    new_image_prediction(classify, 'NewDog/Poodle.jpeg', transform)
+
 
