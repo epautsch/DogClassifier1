@@ -16,6 +16,7 @@ from sklearn.model_selection import train_test_split
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+from huggingface_hub import hf_hub_download
 
 
 def get_detection_model(num_classes: int) -> torchvision.models.detection:
@@ -264,7 +265,36 @@ def visualize_predictions(model, dataset, device, dog_breeds, num_images=5, save
         print(f'Saved prediction_{i}.jpg')
 
 
-def run(num_epochs, train=True, model_save_path='./dog_breed_detection_model_2.pth'):
+def predict(model: torch.nn.Module, image_path: str, dog_breeds: list, device: torch.device) -> np.ndarray:
+    model.eval()
+
+    img = cv2.imread(image_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = get_transforms()(img)
+    img_tensor = img.unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        prediction = model(img_tensor)[0]
+
+        img_np = img.permute(1, 2, 0).numpy()
+        img_np = (img_np * np.array([0.229, 0.224, 0.225])) + np.array([0.485, 0.456, 0.406])
+        img_np = (img_np * 255).astype(np.uint8)
+
+        img_umat = cv2.UMat(img_np)
+
+        highest_conf = prediction['scores'].max().item()
+        pred_box = prediction['boxes'][prediction['scores'] == highest_conf]
+        pred_box = pred_box.to(torch.int64).tolist()[0]
+        pred_label = prediction['labels'][prediction['scores'] == highest_conf]
+        pred_label = dog_breeds[pred_label.item()]
+        cv2.rectangle(img_umat, (pred_box[0], pred_box[1]), (pred_box[2], pred_box[3]), (255, 0, 0), 2)
+        cv2.putText(img_umat, f'Pred: {pred_label}', (pred_box[0] + 5, pred_box[1] + 15), cv2.FONT_HERSHEY_SIMPLEX, 3, (176, 4, 4), 5)
+
+    img_np = img_umat.get()
+    return cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+
+
+def run(train=False, num_epochs=50, model_save_path='./dog_breed_detection_model_2.pth'):
     annotations_folder = './Annotations'
     image_folder = './Images'
     annotations, dog_breeds = load_annotations(image_folder, annotations_folder)
@@ -335,7 +365,37 @@ def run(num_epochs, train=True, model_save_path='./dog_breed_detection_model_2.p
         visualize_predictions(model, val_dataset, device, dog_breeds)
 
 
-if __name__ == '__main__':
-    run(num_epochs=50, train=True)
+def load_from_hugging_face():
+    repo = 'ep44/fasterrcnn_resnet50_dog_breed_detection'
+    filename = 'dog_breed_detection_model_2_finished.pth'
+    model_weights = hf_hub_download(repo_id=repo, filename=filename)
+    return model_weights
 
-    run(train=False)
+
+
+if __name__ == '__main__':
+    # run(num_epochs=50, train=True)
+
+    # run(train=False, model_save_path='./dog_breed_detection_model_2_finished.pth')
+
+    ##### Make new prediction #####
+    # model_path = './dog_breed_detection_model_2_finished.pth'
+    model_path = load_from_hugging_face()
+    image_path = './dobey6.jpg'
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # get dog breeds from 'breeds.txt'
+    dog_breeds = []
+    with open('breeds.txt', 'r') as f:
+        for line in f:
+            if line != '\n':
+                dog_breeds.append(line.strip('\n'))
+
+    num_classes = len(dog_breeds) + 1
+    model = get_detection_model(num_classes)
+    model.load_state_dict(torch.load(model_path))
+    model.to(device)
+
+    result_image = predict(model, image_path, dog_breeds, device)
+    cv2.imwrite('dobey_predict_6.png', result_image)
+
