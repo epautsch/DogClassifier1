@@ -246,13 +246,6 @@ def visualize_predictions(model, dataset, device, dog_breeds, num_images=5, save
             cv2.rectangle(img_umat, (pred_box[0], pred_box[1]), (pred_box[2], pred_box[3]), (255, 0, 0), 2)
             cv2.putText(img_umat, f'Pred: {pred_label}', (pred_box[0] + 5, pred_box[1] + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (176, 4, 4), 2)
 
-            # for box, label in zip(prediction['boxes'], prediction['labels']):
-            #     box = box.to(torch.int64).tolist()
-            #     label = dog_breeds[label.item() - 1]
-            #     cv2.rectangle(img_umat, (box[0], box[1]), (box[2], box[3]), (255, 0, 0), 2)
-            #     cv2.putText(img_umat, f'Pred: {label}', (box[0], box[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-            #                 (255, 0, 0), 2)
-
             # ground truth boxes
             for box, label in zip(target['boxes'], target['labels']):
                 box = box.to(torch.int64).tolist()
@@ -381,7 +374,7 @@ if __name__ == '__main__':
     ##### Make new prediction #####
     # model_path = './dog_breed_detection_model_2_finished.pth'
     model_path = load_from_hugging_face()
-    image_path = './dobey6.jpg'
+    image_path = './dobeyViviErik.jpg'
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # get dog breeds from 'breeds.txt'
@@ -393,9 +386,12 @@ if __name__ == '__main__':
 
     num_classes = len(dog_breeds) + 1
     model = get_detection_model(num_classes)
-    model.load_state_dict(torch.load(model_path))
+    if device.type == 'cpu':
+        model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+    else:
+        model.load_state_dict(torch.load(model_path))
     model.to(device)
 
     result_image = predict(model, image_path, dog_breeds, device)
-    cv2.imwrite('dobey_predict_6.png', result_image)
+    cv2.imwrite('dobeyViviErik_predict.png', result_image)
 

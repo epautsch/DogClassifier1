@@ -12,6 +12,8 @@ seaborn = "*"
 opencv-python = "*"
 scikit-learn = "*"
 huggingface-hub = "*"
+torchvision = "*"
+torch = "*"
 
 [dev-packages]
 
