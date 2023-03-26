@@ -17,6 +17,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 from huggingface_hub import hf_hub_download
+from argparse import Namespace
+
+from args import detection
 
 
 def get_detection_model(num_classes: int) -> torchvision.models.detection:
@@ -244,14 +247,16 @@ def visualize_predictions(model, dataset, device, dog_breeds, num_images=5, save
             pred_label = prediction['labels'][prediction['scores'] == highest_conf]
             pred_label = dog_breeds[pred_label.item()]
             cv2.rectangle(img_umat, (pred_box[0], pred_box[1]), (pred_box[2], pred_box[3]), (255, 0, 0), 2)
-            cv2.putText(img_umat, f'Pred: {pred_label}', (pred_box[0] + 5, pred_box[1] + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (176, 4, 4), 2)
+            cv2.putText(img_umat, f'Pred: {pred_label}', (pred_box[0] + 5, pred_box[1] + 15), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5, (176, 4, 4), 2)
 
             # ground truth boxes
             for box, label in zip(target['boxes'], target['labels']):
                 box = box.to(torch.int64).tolist()
                 label = dog_breeds[label.item()]
                 cv2.rectangle(img_umat, (box[0], box[1]), (box[2], box[3]), (20, 20, 245), 2)
-                cv2.putText(img_umat, f'GT: {label}', (box[0] + 5, box[3] - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (20, 20, 245), 2)
+                cv2.putText(img_umat, f'GT: {label}', (box[0] + 5, box[3] - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                            (20, 20, 245), 2)
 
         img_np = img_umat.get()
         cv2.imwrite(os.path.join(save_dir, f'prediction_{i}.jpg'), cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR))
@@ -281,7 +286,8 @@ def predict(model: torch.nn.Module, image_path: str, dog_breeds: list, device: t
         pred_label = prediction['labels'][prediction['scores'] == highest_conf]
         pred_label = dog_breeds[pred_label.item()]
         cv2.rectangle(img_umat, (pred_box[0], pred_box[1]), (pred_box[2], pred_box[3]), (255, 0, 0), 2)
-        cv2.putText(img_umat, f'Pred: {pred_label}', (pred_box[0] + 5, pred_box[1] + 15), cv2.FONT_HERSHEY_SIMPLEX, 3, (176, 4, 4), 5)
+        cv2.putText(img_umat, f'Pred: {pred_label}', (pred_box[0] + 5, pred_box[1] + 75), cv2.FONT_HERSHEY_SIMPLEX, 3,
+                    (176, 4, 4), 5)
 
     img_np = img_umat.get()
     return cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
@@ -365,16 +371,9 @@ def load_from_hugging_face():
     return model_weights
 
 
-
-if __name__ == '__main__':
-    # run(num_epochs=50, train=True)
-
-    # run(train=False, model_save_path='./dog_breed_detection_model_2_finished.pth')
-
-    ##### Make new prediction #####
-    # model_path = './dog_breed_detection_model_2_finished.pth'
+def cli_call(image_path: str, output_path: str) -> None:
     model_path = load_from_hugging_face()
-    image_path = './dobeyViviErik.jpg'
+    image_path = image_path
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # get dog breeds from 'breeds.txt'
@@ -393,5 +392,23 @@ if __name__ == '__main__':
     model.to(device)
 
     result_image = predict(model, image_path, dog_breeds, device)
-    cv2.imwrite('dobeyViviErik_predict.png', result_image)
+    cv2.imwrite(output_path, result_image)
 
+
+if __name__ == '__main__':
+    ### Training ###
+    # run(num_epochs=50, train=True)
+
+    ### Visual predictions example ###
+    # run(train=False, model_save_path='./dog_breed_detection_model_2_finished.pth')
+
+    ### Default CLI call ###
+    args_detector: Namespace = detection()
+    image_path = args_detector.image
+
+    if args_detector.output is not None:
+        output_path = args_detector.output
+    else:
+        output_path = './' + image_path.split('.')[-2] + '_predict.png'
+
+    cli_call(image_path, output_path)
