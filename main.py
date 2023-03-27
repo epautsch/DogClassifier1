@@ -104,7 +104,7 @@ def fine_tune_model(pretrained_model_name: str,
 
 def evaluate_saved_model(model_path: str,
                          feature_extractor_name: str,
-                         test_dataloader: DataLoader) -> Tuple[float, pipeline]:
+                         test_dataloader: DataLoader) -> Tuple[float, pipeline, torch.nn.Module]:
     model = AutoModelForImageClassification.from_pretrained(model_path).to(device)
     feature_extractor = AutoFeatureExtractor.from_pretrained(feature_extractor_name)
 
@@ -130,7 +130,7 @@ def evaluate_saved_model(model_path: str,
     classify = pipeline('image-classification', model=model, feature_extractor=feature_extractor,
                         device=0 if torch.cuda.is_available() else -1)
 
-    return accuracy, classify
+    return accuracy, classify, model
 
 
 class LoggingCallback(DefaultFlowCallback):
@@ -171,36 +171,47 @@ def plot_metrics(losses: list[float], learning_rate: list[float], pretrained_mod
 def imshow(img, label):
     img = img / 2 + 0.5  #unnormalize
     npimg = img.numpy()
+    # print image with prediction and actual label
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.xlabel(label)
     plt.show()
 
-def predict(classify, dataloader, num_images=4):
-    dataiter = iter(dataloader)
-    images, labels = next(dataiter)
+# NEW -Maddie
+def predict(model, dataloader, num_images=4):
+    # get images and actual labels from batch
+    batch = next(iter(dataloader))
+    images, labels = batch
+    # list of dog images
     list_images = [images[j] for j in range(num_images)]
     list_labels = [j for j in range(num_images)]
-    prediction_list = [(classify(transforms.ToPILImage()(list_images[j]).convert("RGB")))[0]['label'] for j in range(num_images)]
-    for j in range(num_images):
-        list_labels[j] = full_dataset.classes[labels[j]].split('-')[1]
-        num = prediction_list[j].split('_')[1]
-        pred = (full_dataset.classes[torch.tensor(int(num))]).split('-')[1]
-        x_label = ("Actual: ", list_labels[j], "Predicted: ", pred)
-        print("Prediction Image: ", pred)
-        print("Actual Image: ", list_labels[j])
-        imshow(list_images[j], x_label)
+    with torch.no_grad():
+        pixel_values = batch[0].to(device)
+        actual_labels = batch[1].to(device)
+        # predict images and retrieve predicted labels - outputs a tensor(#)
+        outputs = model(pixel_values)
+        _, predicted_labels = torch.max(outputs.logits, 1)
+        for j in range(num_images):
+            # retrieve actual label and predicted label class name (dog breed name)
+            list_labels[j] = (full_dataset.classes[int(actual_labels[j].item())]).split('-')[1]
+            pred = (full_dataset.classes[int(predicted_labels[j].item())]).split('-')[1]
+            # prepare to print image with label
+            x_label = ("Actual: ", list_labels[j], "Predicted: ", pred)
+            print("Prediction Image: ", pred)
+            print("Actual Image: ", list_labels[j])
+            imshow(list_images[j], x_label)
+
 
 
 # NEW -Maddie
-def new_image_prediction(model, image_path, transformer):
+def new_image_prediction(model, image_path):
+    # get new image from path
     img_name = Image.open(image_path)
-    #transforms.ToPILImage()(Image.open(image_path)).convert("RGB")
-    #img = ImageFolder(image_path, transformer)
-    #img = transformer(img_name)
-    #PILimage = img.ToPILImage()
-    label = model(img_name) #[0]['label']
+    # predict image
+    label = model(img_name)
+    # get class name/dog breed from prediction
     num = label[0]['label'].split('_')[1]
     prediction = (full_dataset.classes[torch.tensor(int(num))]).split('-')[1]
+    # print image and label
     x_label = ("Predicted: ", prediction)
     plt.imshow(img_name)
     plt.xlabel(x_label)
@@ -248,9 +259,9 @@ if __name__ == '__main__':
     # model_path = 'ep44/Stanford_dogs-google_vit_base_patch16_224'
 
     feature_extractor_name = pretrained_model_name
-    accuracy, classify = evaluate_saved_model(model_path, feature_extractor_name, test_dataloader)
+    accuracy, classify, model = evaluate_saved_model(model_path, feature_extractor_name, test_dataloader)
     # NEW - Maddie
-    predict(classify, test_dataloader, num_images=4)
-    new_image_prediction(classify, 'NewDog/Poodle.jpeg', transform)
+    predict(model, test_dataloader, num_images=10)
+    new_image_prediction(classify, 'NewDog/Poodle.jpeg')
 
 
