@@ -11,6 +11,10 @@ matplotlib = "*"
 seaborn = "*"
 opencv-python = "*"
 scikit-learn = "*"
+huggingface-hub = "*"
+torchvision = "*"
+torch = "*"
+argparse = "*"
 
 [dev-packages]
 
