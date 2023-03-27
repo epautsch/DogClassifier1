@@ -1,3 +1,4 @@
+import cmd
 import os, re
 
 import requests
@@ -13,9 +14,6 @@ from transformers import ViTForImageClassification, ViTFeatureExtractor, Trainer
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-from PIL import Image
-#NEW -Maddie
-from torchvision.utils import make_grid
 from PIL import Image
 
 
@@ -176,6 +174,7 @@ def imshow(img, label):
     plt.xlabel(label)
     plt.show()
 
+
 # NEW -Maddie
 def predict(model, dataloader, num_images=4):
     # get images and actual labels from batch
@@ -201,7 +200,6 @@ def predict(model, dataloader, num_images=4):
             imshow(list_images[j], x_label)
 
 
-
 # NEW -Maddie
 def new_image_prediction(model, image_path):
     # get new image from path
@@ -216,6 +214,34 @@ def new_image_prediction(model, image_path):
     plt.imshow(img_name)
     plt.xlabel(x_label)
     plt.show()
+
+
+# NEW -Maddie
+class command(cmd.Cmd):
+    # Ex: image C:\Users\labUser\PycharmProjects\DogClassifier2\NewDog\Poodle.jpeg
+    def do_image(self, path):
+        if path:
+            if os.path.exists(path):
+                new_image_prediction(classify, path)
+            else:
+                print("Path does not exist")
+        else:
+            print("No path given")
+
+    # Ex: predict 5
+    def do_predict(self, num):
+        if num:
+            predict(model, test_dataloader, int(num))
+        else:
+            predict(model, test_dataloader, 4)
+
+    # Ex: test print this
+    def do_test(self, test):
+        print(test)
+
+    # Ends cmd
+    def do_EOF(self, line):
+        return True
 
 
 if __name__ == '__main__':
@@ -263,5 +289,6 @@ if __name__ == '__main__':
     # NEW - Maddie
     predict(model, test_dataloader, num_images=10)
     new_image_prediction(classify, 'NewDog/Poodle.jpeg')
+    command().cmdloop()
 
 
