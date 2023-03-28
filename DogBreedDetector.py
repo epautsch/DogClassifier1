@@ -293,7 +293,7 @@ def predict(model: torch.nn.Module, image_path: str, dog_breeds: list, device: t
     return cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
 
 
-def run(train=False, num_epochs=50, model_save_path='./dog_breed_detection_model_2.pth'):
+def run(train=False, num_epochs=50, model_save_path='./dog_breed_detection_model_120.pth'):
     annotations_folder = './Annotations'
     image_folder = './Images'
     annotations, dog_breeds = load_annotations(image_folder, annotations_folder)
@@ -354,10 +354,12 @@ def run(train=False, num_epochs=50, model_save_path='./dog_breed_detection_model
         train_time = train_end_time - train_start_time
         print(f'Training finished at {time.strftime("%H:%M:%S", time.localtime())}')
         print(f'Training time: {train_time:.2f} seconds')
+        print(train_losses)
+        print(accuracies)
 
-        plot_metric(train_losses, 'Training Loss per Epoch', 'Epoch', 'Loss', 'dog_breed_detection_train_loss_2.png')
+        plot_metric(train_losses, 'Training Loss per Epoch', 'Epoch', 'Loss', 'dog_breed_detection_train_loss_120.png')
         plot_metric(accuracies, 'Accuracy per Epoch', 'Epoch', 'Accuracy',
-                    'dog_breed_detection_accuracy_2.png')
+                    'dog_breed_detection_accuracy_120.png')
     else:
         model.load_state_dict(torch.load(model_save_path))
         model.to(device)
@@ -397,18 +399,18 @@ def cli_call(image_path: str, output_path: str) -> None:
 
 if __name__ == '__main__':
     ### Training ###
-    # run(num_epochs=50, train=True)
+    # run(train=True, num_epochs=120)
 
     ### Visual predictions example ###
-    # run(train=False, model_save_path='./dog_breed_detection_model_2_finished.pth')
+    run(train=False, model_save_path='./dog_breed_detection_model_2.pth')
 
     ### Default CLI call ###
-    args_detector: Namespace = detection()
-    image_path = args_detector.image
-
-    if args_detector.output is not None:
-        output_path = args_detector.output
-    else:
-        output_path = './' + image_path.split('.')[-2] + '_predict.png'
-
-    cli_call(image_path, output_path)
+    # args_detector: Namespace = detection()
+    # image_path = args_detector.image
+    #
+    # if args_detector.output is not None:
+    #     output_path = args_detector.output
+    # else:
+    #     output_path = './' + image_path.split('.')[-2] + '_predict.png'
+    #
+    # cli_call(image_path, output_path)
